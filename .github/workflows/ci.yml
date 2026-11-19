@@ -1,0 +1,75 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: fmt · clippy · test · reference integration (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      # The reference integration runs against the real core, built from source.
+      - uses: actions/checkout@v4
+        with:
+          repository: EON-Extensible-Open-Network/eon-office-core
+          path: core
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --manifest-path core/Cargo.toml
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - name: Test, including the reference integration
+        shell: bash
+        run: |
+          bin=core/target/debug/eon-office-core
+          [ -f "$bin.exe" ] && bin="$bin.exe"
+          EON_OFFICE_CORE_BIN="$PWD/$bin" cargo test -- --include-ignored
+
+  deny:
+    name: licences · advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - uses: taiki-e/install-action@cargo-deny
+      - run: cargo deny check all
+
+  reuse:
+    name: licence headers (REUSE)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: fsfe/reuse-action@v5
+
+  dco:
+    name: signed-off commits
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Every commit must carry Signed-off-by
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          missing=0
+          while read -r sha; do
+            if ! git log -1 --format=%B "$sha" | grep -qiE '^Signed-off-by: .+ <.+@.+>$'; then
+              echo "::error::missing Signed-off-by: $(git log -1 --oneline "$sha")"
+              missing=1
+            fi
+          done < <(git rev-list "$base..$head")
+          exit $missing

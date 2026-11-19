@@ -1,0 +1,33 @@
+{
+  "manifest": 0,
+  "id": "org.eon.office.hello",
+  "name": "EON Hello",
+  "version": "0.1.0",
+  "api": {
+    "min": 0,
+    "max": 0
+  },
+  "description": "The reference integration for EON Office: stores, indexes, notifies, schedules, publishes, and answers greet.",
+  "entry": {
+    "command": "hello"
+  },
+  "capabilities": [
+    "storage",
+    "notifications",
+    "search.index",
+    "events.publish",
+    "events.subscribe",
+    "schedule"
+  ],
+  "provides": [
+    {
+      "method": "greet",
+      "description": "Greet someone by `name`; returns `greeting`."
+    }
+  ],
+  "publishes": [
+    "ready",
+    "job.done"
+  ],
+  "restart": "on-failure"
+}

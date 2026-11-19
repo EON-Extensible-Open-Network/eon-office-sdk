@@ -1,0 +1,14 @@
+{
+  "manifest": 0,
+  "id": "org.eon.office.caller",
+  "name": "EON Caller",
+  "version": "0.1.0",
+  "api": {
+    "min": 0,
+    "max": 0
+  },
+  "description": "Calls EON Hello if it is there, and carries on if it is not.",
+  "capabilities": [
+    "call:org.eon.office.hello"
+  ]
+}
