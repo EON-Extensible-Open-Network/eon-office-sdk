@@ -1,0 +1,69 @@
+name: release
+
+# A tag `v*` builds the reference applications (EON Hello, EON Caller) on
+# every platform with the pinned toolchain and publishes them with
+# SHA256SUMS.txt. These are the files eon-office-marketplace lists, so the
+# marketplace's first entries point at artefacts a CI run built, not at
+# something built on a laptop.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-x86_64
+            suffix: .exe
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            suffix: ""
+          - os: macos-latest
+            platform: macos-aarch64
+            suffix: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - run: cargo build --release --examples
+      - name: Stage
+        shell: bash
+        run: |
+          mkdir dist
+          for app in hello caller; do
+            cp "target/release/examples/${app}${{ matrix.suffix }}" "dist/eon-${app}-${GITHUB_REF_NAME}-${{ matrix.platform }}${{ matrix.suffix }}"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: dist/*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --prerelease \
+            --title "eon-office-sdk $GITHUB_REF_NAME — reference applications" \
+            --notes "EON Hello and EON Caller, the reference integration for EON Office protocol v0, built by CI for Windows, Linux and macOS (Apple silicon). They need an EON Office core to talk to. Not signed: EON holds no signing keys yet (madde 30, 34). Check files against SHA256SUMS.txt."
